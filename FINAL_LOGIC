@@ -1,0 +1,177 @@
+#include <ESP32Servo.h>
+
+#define LED_PIN 12
+#define BUZZER_PIN 14
+#define ULTRASONIC_TRIG_PIN 5
+#define ULTRASONIC_ECHO_PIN 18
+#define SERVO_PIN 13
+#define LDR1_PIN 32
+// #define LDR2_PIN 33
+// #define LDR3_PIN 34
+
+// Threshold
+const int darkThreshold = 100;     // Below this = seat taken (dark)
+const int brightThreshold = 500;   // Above this = seat empty (bright)
+const int obstacleDistance = 10;   // Obstacle distance
+const int maxValidDistance = 200;  // Maximum valid distance
+
+Servo myServo;
+bool doorIsOpen = false;
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Train Door System Starting...");
+  
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
+  pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+  pinMode(LDR1_PIN, INPUT);
+  
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);
+  doorIsOpen = false;
+  
+  Serial.println("Door is closed and ready");
+}
+
+void loop() {
+  // Read LDRs
+  int ldr1Value = analogRead(LDR1_PIN);
+  // TODO: When you add more LDRs, add these lines:
+  // int ldr2Value = analogRead(LDR2_PIN);
+  // int ldr3Value = analogRead(LDR3_PIN);
+  int distance = readUltrasonicDistance();
+  
+  // Print sensor values
+  Serial.print("LDR1: ");
+  Serial.print(ldr1Value);
+  // TODO: When you add more LDRs, add these lines:
+  // Serial.print(" | LDR2: ");
+  // Serial.print(ldr2Value);
+  // Serial.print(" | LDR3: ");
+  // Serial.print(ldr3Value);
+  Serial.print(" | Distance: ");
+  if (distance == -1) {
+    Serial.print("Out of range");
+  } else {
+    Serial.print(distance);
+    Serial.print(" cm");
+  }
+  Serial.print(" | Door Open: ");
+  Serial.println(doorIsOpen);
+  
+  // Check seat status with all LDR values
+  checkSeats(ldr1Value
+    // TODO: When you add more LDRs, add these parameters:
+    // , ldr2Value
+    // , ldr3Value
+  );
+  
+  delay(500);
+}
+
+void checkSeats(int ldr1
+  // TODO: When you add more LDRs, add these parameters:
+  // , int ldr2
+  // , int ldr3
+) {
+  bool seat1Empty = (ldr1 > brightThreshold);
+  bool seat1Taken = (ldr1 < darkThreshold);
+  
+  // TODO: When you add more LDRs, add these lines:
+  // bool seat2Empty = (ldr2 > brightThreshold);
+  // bool seat2Taken = (ldr2 < darkThreshold);
+  // bool seat3Empty = (ldr3 > brightThreshold);
+  // bool seat3Taken = (ldr3 < darkThreshold);
+  
+  // For now just seat 1
+  bool allSeatsEmpty = seat1Empty;
+  // TODO: When you add more LDRs, change to:
+  // bool allSeatsEmpty = (seat1Empty && seat2Empty && seat3Empty);
+  
+  // For now just seat 1
+  bool allSeatsTaken = seat1Taken;
+  // TODO: When you add more LDRs, change to:
+  // bool allSeatsTaken = (seat1Taken && seat2Taken && seat3Taken);
+  
+  // Simple logic: if all seats empty and door closed, open door
+  if (allSeatsEmpty && !doorIsOpen) {
+    Serial.println("All seats empty - opening door");
+    openDoor();
+  }
+  
+  // Simple logic: if all seats taken and door open, close door
+  if (allSeatsTaken && doorIsOpen) {
+    Serial.println("All seats taken - closing door");
+    closeDoor();
+  }
+}
+
+void openDoor() {
+  Serial.println("Starting to open door");
+  flashLEDAndBeep();
+  myServo.write(90);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(BUZZER_PIN);
+  doorIsOpen = true;
+  Serial.println("Door is now open");
+}
+
+void closeDoor() {
+  Serial.println("Starting to close door");
+  flashLEDAndBeep();
+  
+  int distance = readUltrasonicDistance();
+
+  if (distance != -1 && distance < obstacleDistance) {
+    Serial.println("OBSTACLE DETECTED! Cannot close door");
+    handleObstacle();
+    return;
+  }
+  
+  myServo.write(0);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(BUZZER_PIN);
+  doorIsOpen = false;
+  Serial.println("Door is now closed");
+}
+
+void handleObstacle() {
+  Serial.println("HANDLING OBSTACLE - Opening door for safety");
+  myServo.write(90);
+  digitalWrite(LED_PIN, HIGH);
+  tone(BUZZER_PIN, 1000);
+  delay(2000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(BUZZER_PIN);
+  doorIsOpen = true;
+  Serial.println("Door opened due to obstacle");
+}
+
+void flashLEDAndBeep() {
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    tone(BUZZER_PIN, 988);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+    noTone(BUZZER_PIN);
+    delay(200);
+  }
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  
+  long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return -1;
+  
+  int distanceCm = duration * 0.034 / 2;
+  return (distanceCm > 0 && distanceCm <= maxValidDistance) ? distanceCm : -1;
+}
