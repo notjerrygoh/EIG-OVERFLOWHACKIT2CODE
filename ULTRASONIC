@@ -1,0 +1,31 @@
+#define TRIGGER_PIN 5
+#define ECHO_PIN 18
+
+void setup() {
+	// put your setup code here, to run once:
+	pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
+  	pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+}
+
+void loop() {
+  	int currentDistanceCm = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  
+  	Serial.print("Distance: ");
+  	Serial.print(currentDistanceCm);
+  	Serial.println(" cm");
+  
+  	delay(500);
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+
+  long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  int distanceCm = duration * 0.034 / 2;
+  
+  return distanceCm;
+}
