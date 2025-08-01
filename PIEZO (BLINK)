@@ -1,20 +1,20 @@
 #define LED_PIN 12 
-#define BUZZER_PIN 14
+#define PIEZO_PIN 14
 
 void setup() {
   Serial.begin(9600);
   Serial.print("Program is starting!");
   pinMode(LED_PIN, OUTPUT);
-  pinMode(BUZZER_PIN, OUTPUT); 
+  pinMode(PIEZO_PIN, OUTPUT); 
 }
 
 void loop() {
   digitalWrite(LED_PIN, HIGH);
-  tone(BUZZER_PIN, 988); 
+  tone(PIEZO_PIN, 988); 
   Serial.println("LED = HIGH");
   delay(1000);
   digitalWrite(LED_PIN, LOW);
-  noTone(BUZZER_PIN);   
+  noTone(PIEZO_PIN);   
   Serial.println("LED = LOW");
   delay(1000);                      
 }
