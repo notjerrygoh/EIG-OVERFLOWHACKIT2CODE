@@ -8,7 +8,7 @@ void setup() {
 }
 
 void loop() {
-  	int currentDistanceCm = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  	int currentDistanceCm = readUltrasonicDistance();
   
   	Serial.print("Distance: ");
   	Serial.print(currentDistanceCm);
