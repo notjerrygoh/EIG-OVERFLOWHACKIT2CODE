@@ -1,16 +1,15 @@
-#define LDR1_PIN 32
-#define LDR2_PIN 33
-#define LDR3_PIN 34
+#define LDR1_PIN 34
+#define LDR2_PIN 39
+#define LDR3_PIN 36
 
 void setup() {  
-Serial.begin(9600);   
+  Serial.begin(9600);   
 }
 
 void loop() {
   int ldr1Value = analogRead(LDR1_PIN);
   int ldr2Value = analogRead(LDR2_PIN);
   int ldr3Value = analogRead(LDR3_PIN);
-}
 
   Serial.print("LDR 1: ");
   Serial.print(ldr1Value);
