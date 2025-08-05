@@ -5,13 +5,12 @@
 #define ULTRASONIC_TRIG_PIN 5
 #define ULTRASONIC_ECHO_PIN 18
 #define SERVO_PIN 13
-#define LDR1_PIN 32
-// #define LDR2_PIN 33
-// #define LDR3_PIN 34
+#define LDR1_PIN 34
+#define LDR2_PIN 39
+#define LDR3_PIN 36
 
 // Threshold
-const int darkThreshold = 100;     // Below this = seat taken (dark)
-const int brightThreshold = 500;   // Above this = seat empty (bright)
+const int threshold = 1000;  // Above this = seat taken, below this = seat empty
 const int obstacleDistance = 10;   // Obstacle distance
 const int maxValidDistance = 200;  // Maximum valid distance
 
@@ -38,19 +37,17 @@ void setup() {
 void loop() {
   // Read LDRs
   int ldr1Value = analogRead(LDR1_PIN);
-  // TODO: When you add more LDRs, add these lines:
-  // int ldr2Value = analogRead(LDR2_PIN);
-  // int ldr3Value = analogRead(LDR3_PIN);
+  int ldr2Value = analogRead(LDR2_PIN);
+  int ldr3Value = analogRead(LDR3_PIN);
   int distance = readUltrasonicDistance();
   
   // Print sensor values
   Serial.print("LDR1: ");
   Serial.print(ldr1Value);
-  // TODO: When you add more LDRs, add these lines:
-  // Serial.print(" | LDR2: ");
-  // Serial.print(ldr2Value);
-  // Serial.print(" | LDR3: ");
-  // Serial.print(ldr3Value);
+  Serial.print(" | LDR2: ");
+  Serial.print(ldr2Value);
+  Serial.print(" | LDR3: ");
+  Serial.print(ldr3Value);
   Serial.print(" | Distance: ");
   if (distance == -1) {
     Serial.print("Out of range");
@@ -62,38 +59,21 @@ void loop() {
   Serial.println(doorIsOpen);
   
   // Check seat status with all LDR values
-  checkSeats(ldr1Value
-    // TODO: When you add more LDRs, add these parameters:
-    // , ldr2Value
-    // , ldr3Value
-  );
+  checkSeats(ldr1Value, ldr2Value, ldr3Value);
   
   delay(500);
 }
 
-void checkSeats(int ldr1
-  // TODO: When you add more LDRs, add these parameters:
-  // , int ldr2
-  // , int ldr3
-) {
-  bool seat1Empty = (ldr1 > brightThreshold);
-  bool seat1Taken = (ldr1 < darkThreshold);
+void checkSeats(int ldr1, int ldr2, int ldr3) {
+  bool seat1Empty = (ldr1 < threshold);
+  bool seat1Taken = (ldr1 > threshold);
+  bool seat2Empty = (ldr2 < threshold);
+  bool seat2Taken = (ldr2 > threshold);
+  bool seat3Empty = (ldr3 < threshold);
+  bool seat3Taken = (ldr3 > threshold);
   
-  // TODO: When you add more LDRs, add these lines:
-  // bool seat2Empty = (ldr2 > brightThreshold);
-  // bool seat2Taken = (ldr2 < darkThreshold);
-  // bool seat3Empty = (ldr3 > brightThreshold);
-  // bool seat3Taken = (ldr3 < darkThreshold);
-  
-  // For now just seat 1
-  bool allSeatsEmpty = seat1Empty;
-  // TODO: When you add more LDRs, change to:
-  // bool allSeatsEmpty = (seat1Empty && seat2Empty && seat3Empty);
-  
-  // For now just seat 1
-  bool allSeatsTaken = seat1Taken;
-  // TODO: When you add more LDRs, change to:
-  // bool allSeatsTaken = (seat1Taken && seat2Taken && seat3Taken);
+  bool allSeatsEmpty = (seat1Empty && seat2Empty && seat3Empty);
+  bool allSeatsTaken = (seat1Taken && seat2Taken && seat3Taken);
   
   // Simple logic: if all seats empty and door closed, open door
   if (allSeatsEmpty && !doorIsOpen) {
@@ -143,7 +123,7 @@ void handleObstacle() {
   Serial.println("HANDLING OBSTACLE - Opening door for safety");
   myServo.write(90);
   digitalWrite(LED_PIN, HIGH);
-  tone(BUZZER_PIN, 1000);
+  tone(PIEZO_PIN, 1000);
   delay(2000);
   digitalWrite(LED_PIN, LOW);
   noTone(PIEZO_PIN);
