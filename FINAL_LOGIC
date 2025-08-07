@@ -16,6 +16,7 @@ const int maxValidDistance = 200;  // Maximum valid distance
 
 Servo myServo;
 bool doorIsOpen = false;
+bool seat1, seat2, seat3;
 
 void setup() {
   Serial.begin(9600);
@@ -40,6 +41,9 @@ void loop() {
   int ldr2Value = analogRead(LDR2_PIN);
   int ldr3Value = analogRead(LDR3_PIN);
   int distance = readUltrasonicDistance();
+  seat1 = ldr1Value > threshold;
+  seat2 = ldr2Value > threshold;
+  seat3 = ldr3Value > threshold;
   
   // Print sensor values
   Serial.print("LDR1: ");
