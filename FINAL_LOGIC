@@ -74,18 +74,6 @@ void checkSeats(int ldr1, int ldr2, int ldr3) {
   
   bool allSeatsEmpty = (seat1Empty && seat2Empty && seat3Empty);
   bool allSeatsTaken = (seat1Taken && seat2Taken && seat3Taken);
-  
-  // Simple logic: if all seats empty and door closed, open door
-  if (allSeatsEmpty && !doorIsOpen) {
-    Serial.println("All seats empty - opening door");
-    openDoor();
-  }
-  
-  // Simple logic: if all seats taken and door open, close door
-  if (allSeatsTaken && doorIsOpen) {
-    Serial.println("All seats taken - closing door");
-    closeDoor();
-  }
 }
 
 void openDoor() {
