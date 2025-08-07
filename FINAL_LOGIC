@@ -1,5 +1,17 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
 #include <ESP32Servo.h>
+#include <ArduinoJson.h>
 
+// === CONFIGURATION ===
+const char* ssid = "MCBURGER";
+const char* password = "Gaming20";
+const char* mqtt_server = "192.168.249.180";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// === PINS ===
 #define LED_PIN 12
 #define PIEZO_PIN 14
 #define ULTRASONIC_TRIG_PIN 5
@@ -9,95 +21,155 @@
 #define LDR2_PIN 39
 #define LDR3_PIN 36
 
-// Threshold
-const int threshold = 1000;  // Above this = seat taken, below this = seat empty
-const int obstacleDistance = 10;   // Obstacle distance
-const int maxValidDistance = 200;  // Maximum valid distance
+// === CONSTANTS ===
+const int threshold = 1000;
+const int obstacleDistance = 10;
+const int maxValidDistance = 200;
 
+// === GLOBALS ===
 Servo myServo;
 bool doorIsOpen = false;
-bool seat1, seat2, seat3;
 
+// === WIFI + MQTT ===
+void setup_wifi() {
+  delay(10);
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected, IP: " + WiFi.localIP().toString());
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Connecting to MQTT...");
+    if (client.connect("ESP32TrainDoor")) {
+      Serial.println("connected");
+      client.subscribe("train/door/control");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+// === SETUP ===
 void setup() {
   Serial.begin(9600);
   Serial.println("Train Door System Starting...");
-  
+
   pinMode(LED_PIN, OUTPUT);
   pinMode(PIEZO_PIN, OUTPUT);
   pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
   pinMode(ULTRASONIC_ECHO_PIN, INPUT);
   pinMode(LDR1_PIN, INPUT);
-  
+  pinMode(LDR2_PIN, INPUT);
+  pinMode(LDR3_PIN, INPUT);
+
   myServo.attach(SERVO_PIN);
   myServo.write(0);
   doorIsOpen = false;
-  
+
+  setup_wifi();
+  client.setCallback(mqttCallback);
+  client.setServer(mqtt_server, 1883);
+
   Serial.println("Door is closed and ready");
 }
 
+// === LOOP ===
 void loop() {
-  // Read LDRs
-  int ldr1Value = analogRead(LDR1_PIN);
-  int ldr2Value = analogRead(LDR2_PIN);
-  int ldr3Value = analogRead(LDR3_PIN);
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  int ldr1 = analogRead(LDR1_PIN);
+  int ldr2 = analogRead(LDR2_PIN);
+  int ldr3 = analogRead(LDR3_PIN);
   int distance = readUltrasonicDistance();
-  seat1 = ldr1Value > threshold;
-  seat2 = ldr2Value > threshold;
-  seat3 = ldr3Value > threshold;
-  
-  // Print sensor values
-  Serial.print("LDR1: ");
-  Serial.print(ldr1Value);
-  Serial.print(" | LDR2: ");
-  Serial.print(ldr2Value);
-  Serial.print(" | LDR3: ");
-  Serial.print(ldr3Value);
+
+  bool seat1Taken = ldr1 > threshold;
+  bool seat2Taken = ldr2 > threshold;
+  bool seat3Taken = ldr3 > threshold;
+
+  Serial.print("LDR1: "); Serial.print(ldr1);
+  Serial.print(" | LDR2: "); Serial.print(ldr2);
+  Serial.print(" | LDR3: "); Serial.print(ldr3);
   Serial.print(" | Distance: ");
-  if (distance == -1) {
-    Serial.print("Out of range");
-  } else {
-    Serial.print(distance);
-    Serial.print(" cm");
-  }
-  Serial.print(" | Door Open: ");
-  Serial.println(doorIsOpen);
-  
+  if (distance == -1) Serial.print("Out of range");
+  else Serial.print(distance); Serial.print(" cm");
+  Serial.print(" | Door Open: "); Serial.println(doorIsOpen);
+
+  checkSeats(seat1Taken, seat2Taken, seat3Taken);
   delay(500);
 }
 
+// === SEAT CHECK ===
+void checkSeats(bool s1, bool s2, bool s3) {
+  bool allTaken = s1 && s2 && s3;
+  bool allEmpty = !s1 && !s2 && !s3;
+
+  // Construct JSON payload
+  StaticJsonDocument<128> doc;
+  doc["cardId"] = 0;
+
+  JsonObject seats = doc.createNestedObject("seats");
+  seats["0"] = s1;
+  seats["1"] = s2;
+  seats["2"] = s3;
+
+  char buffer[128];
+  serializeJson(doc, buffer);
+  client.publish("seats/status", buffer);
+
+  if (allEmpty && !doorIsOpen) {
+    Serial.println("All seats empty - opening door");
+    mqttPublish("door/status", "doorStatus", "opening");
+    openDoor();
+  }
+
+  if (allTaken && doorIsOpen) {
+    Serial.println("All seats taken - closing door");
+    mqttPublish("door/status", "doorStatus", "closing");
+    closeDoor();
+  }
+}
+
+
+// === DOOR FUNCTIONS ===
 void openDoor() {
-  Serial.println("Starting to open door");
   flashLEDAndBeep();
   myServo.write(90);
   delay(3000);
   digitalWrite(LED_PIN, LOW);
   noTone(PIEZO_PIN);
   doorIsOpen = true;
-  Serial.println("Door is now open");
+  mqttPublish("door/status", "doorStatus", "open");
 }
 
 void closeDoor() {
-  Serial.println("Starting to close door");
   flashLEDAndBeep();
-  
   int distance = readUltrasonicDistance();
 
   if (distance != -1 && distance < obstacleDistance) {
     Serial.println("OBSTACLE DETECTED! Cannot close door");
+    mqttPublish("door/status", "doorStatus", "blocked");
     handleObstacle();
     return;
   }
-  
+
   myServo.write(0);
   delay(3000);
   digitalWrite(LED_PIN, LOW);
   noTone(PIEZO_PIN);
   doorIsOpen = false;
-  Serial.println("Door is now closed");
+  mqttPublish("door/status", "doorStatus", "closed");
 }
 
 void handleObstacle() {
-  Serial.println("HANDLING OBSTACLE - Opening door for safety");
   myServo.write(90);
   digitalWrite(LED_PIN, HIGH);
   tone(PIEZO_PIN, 1000);
@@ -105,9 +177,10 @@ void handleObstacle() {
   digitalWrite(LED_PIN, LOW);
   noTone(PIEZO_PIN);
   doorIsOpen = true;
-  Serial.println("Door opened due to obstacle");
+  mqttPublish("door/status", "doorStatus", "reopened_due_to_obstacle");
 }
 
+// === UTILITY FUNCTIONS ===
 void flashLEDAndBeep() {
   for (int i = 0; i < 5; i++) {
     digitalWrite(LED_PIN, HIGH);
@@ -125,10 +198,48 @@ int readUltrasonicDistance() {
   digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
-  
+
   long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, 30000);
   if (duration == 0) return -1;
-  
+
   int distanceCm = duration * 0.034 / 2;
   return (distanceCm > 0 && distanceCm <= maxValidDistance) ? distanceCm : -1;
+}
+
+void mqttPublish(const char* topic, const char* key, const char* value) {
+  if (client.connected()) {
+    String message = "{\"" + String(key) + "\":\"" + String(value) + "\"}";
+    client.publish(topic, message.c_str());
+    Serial.print("MQTT published → ");
+    Serial.print(topic);
+    Serial.print(": ");
+    Serial.println(message);
+  }
+}
+
+// === MQTT Callback ===
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("MQTT message arrived [");
+  Serial.print(topic);
+  Serial.print("]: ");
+
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.println(message);
+
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, message);
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.f_str());
+    return;
+  }
+
+  const char* type = doc["type"];
+  if (strcmp(type, "closeDoor") == 0) {
+    Serial.println("Received closeDoor command");
+    closeDoor();
+  }
 }
