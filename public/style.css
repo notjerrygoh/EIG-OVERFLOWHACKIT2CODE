@@ -219,6 +219,15 @@ body {
     cursor: pointer;
 }
 
+.open-door-btn {
+    background: #fbfffc;
+    color: rgb(0, 0, 0);
+    border-radius: 50px;
+    border: 1px solid #4baf46;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 10px;

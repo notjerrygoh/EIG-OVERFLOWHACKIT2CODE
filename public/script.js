@@ -48,6 +48,7 @@ function renderTrains() {
                     <div class="train-stat">Occupied: ${trainStats.occupied}</div>
                     <div class="train-stat">Rate: ${trainStats.rate}%</div>
                     <button class="close-door-btn" onclick="sendCloseDoor('${train.id}')">🚪 Close All Doors</button>
+                    <button class="open-door-btn" onclick="sendOpenDoor('${train.id}')">🔓 Open All Doors</button>
                 </div>
             </div>
         `;
@@ -147,6 +148,8 @@ function updateStatistics() {
     document.getElementById('occupancyRate').textContent = rate + '%';
 }
 
+
+
 function simulateDataUpdate() {
     seatMonitor.trains.forEach(train => {
         train.cars.forEach(car => {
@@ -221,59 +224,19 @@ function sendCloseDoor(trainId) {
     mqttClient.publish(mqtt_pub_topic, json);
 }
 
+function sendOpenDoor(trainId) {
+    const message = {
+        type: 'openDoor',
+        trainId: trainId,
+        scope: 'all'
+    };
+    const json = JSON.stringify(message);
+    console.log('[MQTT OUTGOING - OPEN ALL DOORS]', json);
+
+    mqttClient.publish(mqtt_pub_topic, json);
+}
+
 initializeTrains();
 renderTrains();
 updateStatistics();
 initializeMQTT();
-
-// let mqttClient;
-
-// function initializeMQTT() {
-//     // Connect to MQTT broker (change this to your actual broker)
-//     mqttClient = mqtt.connect('ws://localhost:9001'); // e.g., Mosquitto WebSocket port
-
-//     mqttClient.on('connect', () => {
-//         console.log('[MQTT CONNECTED]');
-
-//         // Subscribe to seat updates
-//         mqttClient.subscribe('train/seats/update', (err) => {
-//             if (err) console.error('[MQTT SUBSCRIBE ERROR]', err);
-//             else console.log('[MQTT SUBSCRIBED] train/seats/update');
-//         });
-//     });
-
-//     mqttClient.on('message', (topic, message) => {
-//         console.log(`[MQTT INCOMING] Topic: ${topic}`, message.toString());
-
-//         try {
-//             const data = JSON.parse(message.toString());
-
-//             if (topic === 'train/seats/update' && data.seatId && data.status) {
-//                 handleWebSocketMessage(data); // reuse same handler
-//             }
-//         } catch (err) {
-//             console.error('[MQTT ERROR] Failed to parse', err);
-//         }
-//     });
-
-//     mqttClient.on('error', (err) => {
-//         console.error('[MQTT ERROR]', err);
-//     });
-
-//     mqttClient.on('close', () => {
-//         console.log('[MQTT DISCONNECTED]');
-//     });
-// }
-
-// function sendCloseDoor(trainId) {
-//     const message = {
-//         type: 'closeDoor',
-//         trainId: trainId
-//     };
-//     const json = JSON.stringify(message);
-//     console.log('[MQTT OUTGOING]', json);
-
-//     mqttClient.publish('train/door/control', json);
-// }
-
-// initializeMQTT();
