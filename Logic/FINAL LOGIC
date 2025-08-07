@@ -1,0 +1,166 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ESP32Servo.h>
+#include <ArduinoJson.h>
+
+// === CONFIGURATION ===
+const char* ssid = "MCBURGER";
+const char* password = "Gaming20";
+const char* mqtt_server = "192.168.249.180";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// === PINS ===
+#define LED_PIN 12
+#define PIEZO_PIN 14
+#define ULTRASONIC_TRIG_PIN 33
+#define ULTRASONIC_ECHO_PIN 4
+#define SERVO_PIN 13
+#define LDR1_PIN 25
+#define LDR2_PIN 26
+#define LDR3_PIN 27
+
+// === CONSTANTS ===
+const int threshold = 1000;
+const int obstacleDistance = 10;
+const int maxValidDistance = 200;
+
+// === GLOBALS ===
+Servo myServo;
+bool doorIsOpen = false;
+bool seat1, seat2, seat3;
+
+// === WIFI + MQTT ===
+void setup_wifi() {
+  delay(10);
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected, IP: " + WiFi.localIP().toString());
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Connecting to MQTT...");
+    if (client.connect("ESP32TrainDoor")) {
+      Serial.println("connected");
+      client.subscribe("train/door/control");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+// === SETUP ===
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Train Door System Starting...");
+
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(PIEZO_PIN, OUTPUT);
+  pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
+  pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+  pinMode(LDR1_PIN, INPUT);
+  pinMode(LDR2_PIN, INPUT);
+  pinMode(LDR3_PIN, INPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);
+  doorIsOpen = false;
+
+  setup_wifi();
+  client.setCallback(mqttCallback);
+  client.setServer(mqtt_server, 1883);
+
+  Serial.println("Door is closed and ready");
+}
+
+// === LOOP ===
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  int ldr1 = analogRead(LDR1_PIN);
+  int ldr2 = analogRead(LDR2_PIN);
+  int ldr3 = analogRead(LDR3_PIN);
+  int distance = readUltrasonicDistance();
+
+  seat1 = ldr1 > threshold;
+  seat2 = ldr2 > threshold;
+  seat3 = ldr3 > threshold;
+
+  Serial.print("LDR1: "); Serial.print(ldr1);
+  Serial.print(" | LDR2: "); Serial.print(ldr2);
+  Serial.print(" | LDR3: "); Serial.print(ldr3);
+  Serial.print(" | Distance: ");
+  if (distance == -1) Serial.print("Out of range");
+  else Serial.print(distance); Serial.print(" cm");
+  Serial.print(" | Door Open: "); Serial.println(doorIsOpen);
+
+  checkSeats(seat1, seat2, seat3);
+  delay(500);
+}
+
+// === SEAT CHECK ===
+void checkSeats(bool s1, bool s2, bool s3) {
+  // Construct JSON payload
+  StaticJsonDocument<128> doc;
+  doc["cardId"] = 0;
+
+  JsonObject seats = doc.createNestedObject("seats");
+  seats["0"] = s1;
+  seats["1"] = s2;
+  seats["2"] = s3;
+
+  char buffer[128];
+  serializeJson(doc, buffer);
+  client.publish("seats/status", buffer);
+}
+
+// === DOOR FUNCTIONS ===
+void openDoor() {
+  flashLEDAndBeep();
+  myServo.write(90);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = true;
+  mqttPublish("door/status", "doorStatus", "open");
+}
+
+void closeDoor() {
+  flashLEDAndBeep();
+  int distance = readUltrasonicDistance();
+
+  if (distance != -1 && distance < obstacleDistance) {
+    Serial.println("OBSTACLE DETECTED! Cannot close door");
+    mqttPublish("door/status", "doorStatus", "blocked");
+    handleObstacle();
+    return;
+  }
+
+  myServo.write(0);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = false;
+  mqttPublish("door/status", "doorStatus", "closed");
+}
+
+void handleObstacle() {
+  myServo.write(90);
+  digitalWrite(LED_PIN, HIGH);
+  tone(PIEZO_PIN, 1000);
+  delay(2000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = true;
+  mqttPublish("door/status", "doorStatus", "reopened_due_to_obstacle");
+}
