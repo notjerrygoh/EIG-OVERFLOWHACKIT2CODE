@@ -164,3 +164,70 @@ void handleObstacle() {
   doorIsOpen = true;
   mqttPublish("door/status", "doorStatus", "reopened_due_to_obstacle");
 }
+
+// === UTILITY FUNCTIONS ===
+void flashLEDAndBeep() {
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    tone(PIEZO_PIN, 988);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+    noTone(PIEZO_PIN);
+    delay(200);
+  }
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+
+  long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return -1;
+
+  int distanceCm = duration * 0.034 / 2;
+  return (distanceCm > 0 && distanceCm <= maxValidDistance) ? distanceCm : -1;
+}
+
+void mqttPublish(const char* topic, const char* key, const char* value) {
+  if (client.connected()) {
+    String message = "{\"" + String(key) + "\":\"" + String(value) + "\"}";
+    client.publish(topic, message.c_str());
+    Serial.print("MQTT published → ");
+    Serial.print(topic);
+    Serial.print(": ");
+    Serial.println(message);
+  }
+}
+
+// === MQTT Callback ===
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("MQTT message arrived [");
+  Serial.print(topic);
+  Serial.print("]: ");
+
+  String message;
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.println(message);
+
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, message);
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.f_str());
+    return;
+  }
+
+  const char* type = doc["type"];
+  if (strcmp(type, "openDoor") == 0) {
+    Serial.println("Received openDoor command");
+    openDoor();
+  } else if (strcmp(type, "closeDoor") == 0) {
+    Serial.println("Received closeDoor command");
+    closeDoor();
+  }
+}
