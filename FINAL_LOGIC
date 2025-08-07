@@ -14,12 +14,12 @@ PubSubClient client(espClient);
 // === PINS ===
 #define LED_PIN 12
 #define PIEZO_PIN 14
-#define ULTRASONIC_TRIG_PIN 5
-#define ULTRASONIC_ECHO_PIN 18
+#define ULTRASONIC_TRIG_PIN 33
+#define ULTRASONIC_ECHO_PIN 4
 #define SERVO_PIN 13
-#define LDR1_PIN 34
-#define LDR2_PIN 39
-#define LDR3_PIN 36
+#define LDR1_PIN 25
+#define LDR2_PIN 26
+#define LDR3_PIN 27
 
 // === CONSTANTS ===
 const int threshold = 1000;
@@ -29,6 +29,7 @@ const int maxValidDistance = 200;
 // === GLOBALS ===
 Servo myServo;
 bool doorIsOpen = false;
+bool seat1, seat2, seat3;
 
 // === WIFI + MQTT ===
 void setup_wifi() {
@@ -91,9 +92,9 @@ void loop() {
   int ldr3 = analogRead(LDR3_PIN);
   int distance = readUltrasonicDistance();
 
-  bool seat1Taken = ldr1 > threshold;
-  bool seat2Taken = ldr2 > threshold;
-  bool seat3Taken = ldr3 > threshold;
+  seat1 = ldr1Value > threshold;
+  seat2 = ldr2Value > threshold;
+  seat3 = ldr3Value > threshold;
 
   Serial.print("LDR1: "); Serial.print(ldr1);
   Serial.print(" | LDR2: "); Serial.print(ldr2);
@@ -103,7 +104,7 @@ void loop() {
   else Serial.print(distance); Serial.print(" cm");
   Serial.print(" | Door Open: "); Serial.println(doorIsOpen);
 
-  checkSeats(seat1Taken, seat2Taken, seat3Taken);
+  checkSeats(seat1, seat2, seat3);
   delay(500);
 }
 
