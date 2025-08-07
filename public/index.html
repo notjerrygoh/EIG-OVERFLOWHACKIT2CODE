@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRT Seat Monitoring System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MRT Seat Monitoring System</h1>
+            <p>Real-time seat availability across all train cars</p>
+        </div>
+
+        <div class="statistics">
+            <div class="stat-card">
+                <h3>Total Seats</h3>
+                <div class="stat-value" id="totalSeats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Available Seats</h3>
+                <div class="stat-value" id="availableSeats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Occupied Seats</h3>
+                <div class="stat-value" id="occupiedSeats">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Occupancy Rate</h3>
+                <div class="stat-value" id="occupancyRate">0%</div>
+            </div>
+        </div>
+
+        <div id="trainsContainer"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-seat empty"></div>
+                <span>Available</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-seat taken"></div>
+                <span>Occupied</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> -->
+
+    <script src="script.js"></script>
+</body>
+</html>
