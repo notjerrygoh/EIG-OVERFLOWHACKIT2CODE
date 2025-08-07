@@ -78,6 +78,7 @@ function renderCar(car, trainId) {
         <div class="car" style="background:${carBgColor}; transition: background 0.5s;">
             <div class="car-header">
                 <span>${car.name}</span>
+                <button class="car-door-btn" onclick="sendCarCloseDoor('${trainId}', '${car.id}')">🚪</button>
             </div>
             <div class="seats-container">
                 <div class="seat-section">
@@ -165,16 +166,23 @@ function simulateDataUpdate() {
 }
 
 function handleWebSocketMessage(data) {
-    seatMonitor.trains.forEach(train => {
-        train.cars.forEach(car => {
-            const seat = car.seats.find(s => s.id === data.seatId);
-            if (seat) {
-                seat.status = data.status;
+    if (data.cardId !== undefined && data.seats) {
+        seatMonitor.trains.forEach(train => {
+            const car = train.cars[data.cardId]; // Get car by index
+            if (car) {
+                // Update each seat in the car
+                Object.keys(data.seats).forEach(seatIndex => {
+                    const seatNumber = parseInt(seatIndex);
+                    const seat = car.seats[seatNumber]; // Get seat by index
+                    if (seat) {
+                        seat.status = data.seats[seatIndex] ? 'taken' : 'empty';
+                    }
+                });
             }
         });
-    });
-    renderTrains();
-    updateStatistics();
+        renderTrains();
+        updateStatistics();
+    }
 }
 
 function initializeMQTT() {
@@ -195,7 +203,7 @@ function initializeMQTT() {
         try {
             const data = JSON.parse(message.toString());
 
-            if (topic === mqtt_sub_topic && data.seatId && data.status) {
+            if (topic === mqtt_sub_topic && data.cardId !== undefined && data.seats) {
                 handleWebSocketMessage(data);
             }
         } catch (err) {
@@ -232,6 +240,19 @@ function sendOpenDoor(trainId) {
     };
     const json = JSON.stringify(message);
     console.log('[MQTT OUTGOING - OPEN ALL DOORS]', json);
+
+    mqttClient.publish(mqtt_pub_topic, json);
+}
+
+function sendCarCloseDoor(trainId, carId) {
+    const message = {
+        type: 'closeDoor',
+        trainId: trainId,
+        carId: carId,
+        scope: 'car'
+    };
+    const json = JSON.stringify(message);
+    console.log('[MQTT OUTGOING - CAR DOOR]', json);
 
     mqttClient.publish(mqtt_pub_topic, json);
 }
