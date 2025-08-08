@@ -6,19 +6,19 @@
 // === CONFIGURATION ===
 const char* ssid = "MCBURGER";
 const char* password = "Gaming20";
-const char* mqtt_server = "192.168.249.180";
+const char* mqtt_server = "192.168.250.180";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 // === PINS ===
 #define LED_PIN 12
-#define ULTRASONIC_TRIG_PIN 33
+#define ULTRASONIC_TRIG_PIN 18
 #define ULTRASONIC_ECHO_PIN 4
 #define SERVO_PIN 13
-#define LDR1_PIN 25
-#define LDR2_PIN 26
-#define LDR3_PIN 27
+#define LDR1_PIN 32
+#define LDR2_PIN 33
+#define LDR3_PIN 34
 
 // === CONSTANTS ===
 const int threshold = 1000;
