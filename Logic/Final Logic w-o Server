@@ -1,0 +1,142 @@
+#include <ESP32Servo.h>
+
+#define LED_PIN 12
+#define PIEZO_PIN 14
+#define ULTRASONIC_TRIG_PIN 33
+#define ULTRASONIC_ECHO_PIN 4
+#define SERVO_PIN 13
+#define LDR1_PIN 25
+#define LDR2_PIN 26
+#define LDR3_PIN 27
+
+const int threshold = 1000;
+const int obstacleDistance = 10;
+const int maxValidDistance = 200;
+
+Servo myServo;
+bool doorIsOpen = false;
+bool seat1, seat2, seat3;
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Train Door System Starting...");
+
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(PIEZO_PIN, OUTPUT);
+  pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
+  pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+  pinMode(LDR1_PIN, INPUT);
+  pinMode(LDR2_PIN, INPUT);
+  pinMode(LDR3_PIN, INPUT);
+
+  myServo.attach(SERVO_PIN);
+  myServo.write(0);
+  doorIsOpen = false;
+
+  Serial.println("Door is closed and ready");
+  Serial.println("Commands: open, close, status");
+}
+
+void loop() {
+  handleSerialCommands();
+  
+  int ldr1 = analogRead(LDR1_PIN);
+  int ldr2 = analogRead(LDR2_PIN);
+  int ldr3 = analogRead(LDR3_PIN);
+  int distance = readUltrasonicDistance();
+
+  seat1 = ldr1 > threshold;
+  seat2 = ldr2 > threshold;
+  seat3 = ldr3 > threshold;
+
+  Serial.print("LDR1: "); Serial.print(ldr1);
+  Serial.print(" | LDR2: "); Serial.print(ldr2);
+  Serial.print(" | LDR3: "); Serial.print(ldr3);
+  Serial.print(" | Distance: ");
+  if (distance == -1) Serial.print("Out of range");
+  else Serial.print(distance); Serial.print(" cm");
+  Serial.print(" | Door Open: "); Serial.println(doorIsOpen);
+
+  delay(500);
+}
+
+void handleSerialCommands() {
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    command.toLowerCase();
+    
+    if (command == "open") {
+      openDoor();
+    } else if (command == "close") {
+      closeDoor();
+    } else if (command == "status") {
+      int distance = readUltrasonicDistance();
+      Serial.print("Door: "); Serial.println(doorIsOpen ? "OPEN" : "CLOSED");
+      Serial.print("Distance: "); 
+      if (distance == -1) Serial.println("Out of range");
+      else { Serial.print(distance); Serial.println(" cm"); }
+    }
+  }
+}
+
+void openDoor() {
+  flashLEDAndBeep();
+  myServo.write(90);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = true;
+}
+
+void closeDoor() {
+  flashLEDAndBeep();
+  int distance = readUltrasonicDistance();
+
+  if (distance != -1 && distance < obstacleDistance) {
+    Serial.println("OBSTACLE DETECTED! Cannot close door");
+    handleObstacle();
+    return;
+  }
+
+  myServo.write(0);
+  delay(3000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = false;
+}
+
+void handleObstacle() {
+  myServo.write(90);
+  digitalWrite(LED_PIN, HIGH);
+  tone(PIEZO_PIN, 1000);
+  delay(2000);
+  digitalWrite(LED_PIN, LOW);
+  noTone(PIEZO_PIN);
+  doorIsOpen = true;
+}
+
+void flashLEDAndBeep() {
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    tone(PIEZO_PIN, 988);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+    noTone(PIEZO_PIN);
+    delay(200);
+  }
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+  
+  long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return -1;
+  
+  int distanceCm = duration * 0.034 / 2;
+  return (distanceCm > 0 && distanceCm <= maxValidDistance) ? distanceCm : -1;
+}
