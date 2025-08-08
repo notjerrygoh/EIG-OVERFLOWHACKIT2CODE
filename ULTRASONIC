@@ -1,5 +1,5 @@
-#define TRIGGER_PIN 5
-#define ECHO_PIN 18
+#define TRIGGER_PIN 18
+#define ECHO_PIN 4
 
 void setup() {
 	// put your setup code here, to run once:
