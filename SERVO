@@ -1,12 +1,10 @@
 #include <ESP32Servo.h>
 #define SERVO_PIN 13
-#define RLED_PIN 12
 
 Servo myServo;
 
 void setup() {
    	Serial.begin(9600);
-	pinMode(RLED_PIN, LOW);
  	myServo.attach(SERVO_PIN);
 	myServo.write(0);
 }
