@@ -13,7 +13,6 @@ PubSubClient client(espClient);
 
 // === PINS ===
 #define LED_PIN 12
-#define PIEZO_PIN 14
 #define ULTRASONIC_TRIG_PIN 33
 #define ULTRASONIC_ECHO_PIN 4
 #define SERVO_PIN 13
@@ -64,7 +63,6 @@ void setup() {
   Serial.println("Train Door System Starting...");
 
   pinMode(LED_PIN, OUTPUT);
-  pinMode(PIEZO_PIN, OUTPUT);
   pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
   pinMode(ULTRASONIC_ECHO_PIN, INPUT);
   pinMode(LDR1_PIN, INPUT);
@@ -130,7 +128,6 @@ void openDoor() {
   myServo.write(90);
   delay(3000);
   digitalWrite(LED_PIN, LOW);
-  noTone(PIEZO_PIN);
   doorIsOpen = true;
   mqttPublish("door/status", "doorStatus", "open");
 }
@@ -149,7 +146,6 @@ void closeDoor() {
   myServo.write(0);
   delay(3000);
   digitalWrite(LED_PIN, LOW);
-  noTone(PIEZO_PIN);
   doorIsOpen = false;
   mqttPublish("door/status", "doorStatus", "closed");
 }
@@ -157,10 +153,8 @@ void closeDoor() {
 void handleObstacle() {
   myServo.write(90);
   digitalWrite(LED_PIN, HIGH);
-  tone(PIEZO_PIN, 1000);
   delay(2000);
   digitalWrite(LED_PIN, LOW);
-  noTone(PIEZO_PIN);
   doorIsOpen = true;
   mqttPublish("door/status", "doorStatus", "reopened_due_to_obstacle");
 }
@@ -169,10 +163,8 @@ void handleObstacle() {
 void flashLEDAndBeep() {
   for (int i = 0; i < 5; i++) {
     digitalWrite(LED_PIN, HIGH);
-    tone(PIEZO_PIN, 988);
     delay(200);
     digitalWrite(LED_PIN, LOW);
-    noTone(PIEZO_PIN);
     delay(200);
   }
 }
